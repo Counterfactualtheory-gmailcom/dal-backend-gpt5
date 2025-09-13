@@ -202,6 +202,7 @@ async function sanitize(markdown){
 
 /* ---------------- /ask ---------------- */
 app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
+  console.log('🚀 /ask endpoint triggered'); // DEBUG ADDED
   try {
     let payload;
     if (typeof req.body === 'string') {
@@ -252,8 +253,9 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       messages: payload.messages || [],
       max_completion_tokens: typeof payload.max_completion_tokens === 'number'
         ? payload.max_completion_tokens
-        : 4000,
-      temperature: 1
+        : 2600,
+      temperature: 1,
+      fast: true // ⚡ Added to force GPT-5 to skip deep reasoning and respond instantly
     });
 
     const reply = r.choices?.[0]?.message?.content || '';
