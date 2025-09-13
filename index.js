@@ -250,8 +250,8 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     const r = await openai.chat.completions.create({
       model: 'gpt-5',
       messages: payload.messages || [],
-      max_completion_tokens: typeof payload.max_tokens === 'number' ? payload.max_tokens : 2600,
-      temperature: typeof payload.temperature === 'number' ? payload.temperature : 0.6,
+      max_completion_tokens: typeof payload.max_completion_tokens === 'number' ? payload.max_completion_tokens : 2600,
+      temperature: 1
     });
 
     const reply = r.choices?.[0]?.message?.content || '';
