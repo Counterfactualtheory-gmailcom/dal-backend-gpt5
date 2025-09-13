@@ -202,13 +202,15 @@ async function sanitize(markdown){
 
 /* ---------------- /ask ---------------- */
 app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
-  console.log('🚀 /ask endpoint triggered'); // DEBUG ADDED
+  console.log('🚀 /ask endpoint triggered'); // DEBUG
   try {
     let payload;
     if (typeof req.body === 'string') {
       try { payload = JSON.parse(req.body); }
       catch { payload = { messages: [{ role: 'user', content: req.body }] }; }
     } else { payload = req.body || {}; }
+
+    console.log('📥 Parsed payload (first 300 chars):', JSON.stringify(payload).slice(0, 300)); // DEBUG
 
     /* === NEW: log only the student's or research question (strip scaffolding) === */
     try {
@@ -240,29 +242,28 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       const firstLine = question.split('\n')[0].trim();
       const snippet = firstLine.slice(0, 240);
 
-      if (snippet) console.log('user_input:', snippet);
+      if (snippet) console.log('user_input snippet:', snippet); // DEBUG
     } catch (_) {
-      // never break the request on logging failure
+      console.log('⚠️ Logging block failed'); // DEBUG
     }
     /* === END NEW BLOCK === */
 
-    console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
+    console.log('🔹 Sending request to OpenAI with', (payload.messages || []).length, 'messages'); // DEBUG
 
     const r = await openai.chat.completions.create({
       model: 'gpt-5',
       messages: payload.messages || [],
-      max_completion_tokens: typeof payload.max_completion_tokens === 'number'
-        ? payload.max_completion_tokens
-        : 2600,
-      temperature: 1,
-      fast: true // ⚡ Added to force GPT-5 to skip deep reasoning and respond instantly
+      max_completion_tokens: typeof payload.max_completion_tokens === 'number' ? payload.max_completion_tokens : 2600,
+      temperature: 1
     });
 
     const reply = r.choices?.[0]?.message?.content || '';
+    console.log('✅ OpenAI response received, length:', reply.length); // DEBUG
+
     const safeReply = await sanitize(reply);
     res.json({ answer: safeReply });
   } catch (err){
-    console.error('❌ /ask error:', err.message);
+    console.error('❌ /ask error:', err.message); // DEBUG
     res.status(500).json({ error: 'Failed to process request.' });
   }
 });
@@ -286,10 +287,10 @@ app.post('/log', express.json({ limit: '1mb' }), async (req, res) => {
       [clean(user_input), clean(answer), Number.isFinite(timestamp) ? timestamp : Date.now()]
     );
 
-    console.log('📝 Logged question ID:', result.rows[0]?.id);
+    console.log('📝 Logged question ID:', result.rows[0]?.id); // DEBUG
     res.status(201).json({ ok: true, id: result.rows[0]?.id });
   } catch (err){
-    console.error('❌ /log insert error:', err.message);
+    console.error('❌ /log insert error:', err.message); // DEBUG
     res.status(500).json({ ok: false, error: 'db-insert-failed' });
   }
 });
