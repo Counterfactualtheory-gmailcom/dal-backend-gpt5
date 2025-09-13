@@ -1,4 +1,4 @@
-// index.js — systemic link fidelity fix + skip liveness for trusted domains
+// index.js — systemic link fidelity fix + skip liveness for trusted domains + GPT-5 timeout & debug logs
 
 const express = require('express');
 const cors = require('cors');
@@ -8,6 +8,9 @@ const axios = require('axios');
 
 const app = express();
 const port = process.env.PORT || 8080;
+
+// ===== TIMEOUT SETTING (Adjust as needed) =====
+const GPT_TIMEOUT_MS = 15000; // 15 seconds
 
 app.use(cors());
 
@@ -64,10 +67,8 @@ const DOMAIN_FALLBACKS = {
   "ukings.ca": "https://ukings.ca",
   "dsu.ca": "https://www.dsu.ca",
 
-  // ✅ New systemic redirect for McGill academic lifecycle (sabbaticals, tenure, promotion)
+  // ✅ McGill redirects
   "apo.mcgill.ca": "https://www.mcgill.ca/apo/",
-
-  // ✅ Default McGill fallback remains the Research portal
   "mcgill.ca": "https://www.mcgill.ca/research/",
   "mcgilllibrary.ca": "https://www.mcgill.ca/library",
 
@@ -87,7 +88,7 @@ function extractUrls(text){
   return [...new Set((text.match(/https?:\/\/[^\s)\]]+/gi) || []))];
 }
 function normUrl(u){
-  try{
+  try {
     const x = new URL(u);
     x.hash=""; x.search="";
     return x.toString().replace(/\/$/,"").toLowerCase();
@@ -111,7 +112,6 @@ function fixMalformedEmails(text){
 }
 
 /* ---------------- Liveness Skips ---------------- */
-// ✅ Domains we will NEVER run liveness checks on
 const SKIP_LIVENESS = new Set(["mcgill.ca", "dal.ca", "ukings.ca"]);
 
 /* ---------------- LIVE LINK GUARD ---------------- */
@@ -124,8 +124,7 @@ function okStatus(s){ return (s >= 200 && s < 400) || SOFT_OK.has(s); }
 async function isLiveUrl(url){
   const hname = hostOf(url);
   if (SKIP_LIVENESS.has(hname) || SKIP_LIVENESS.has(base2(hname))) {
-    // ✅ Treat as always live
-    return true;
+    return true; // Always trust these domains
   }
 
   const now = Date.now();
@@ -202,7 +201,7 @@ async function sanitize(markdown){
 
 /* ---------------- /ask ---------------- */
 app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
-  console.log('🚀 /ask endpoint triggered'); // DEBUG
+  console.log('🚀 /ask endpoint triggered');
   try {
     let payload;
     if (typeof req.body === 'string') {
@@ -210,60 +209,41 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       catch { payload = { messages: [{ role: 'user', content: req.body }] }; }
     } else { payload = req.body || {}; }
 
-    console.log('📥 Parsed payload (first 300 chars):', JSON.stringify(payload).slice(0, 300)); // DEBUG
+    console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
-    /* === NEW: log only the student's or research question (strip scaffolding) === */
+    // === GPT-5 request with timeout ===
+    console.log(`⏱️ OpenAI request started at ${new Date().toISOString()}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      console.error('⛔ GPT-5 request timed out after', GPT_TIMEOUT_MS, 'ms');
+    }, GPT_TIMEOUT_MS);
+
+    let r;
     try {
-      const msgs = Array.isArray(payload.messages) ? payload.messages : [];
-      const lastUserMsg = [...msgs].reverse().find(m => m && m.role === 'user');
-
-      const toText = (c) => {
-        if (typeof c === 'string') return c;
-        if (Array.isArray(c)) return c.map(p => (typeof p?.text === 'string' ? p.text : '')).join(' ');
-        if (c && typeof c === 'object' && typeof c.text === 'string') return c.text;
-        return '';
-      };
-
-      const raw = toText(lastUserMsg?.content || '');
-      const normalized = raw
-        .replace(/[\u2018\u2019]/g, "'")
-        .replace(/[\u201C\u201D]/g, '"')
-        .replace(/\r/g, '')
-        .trim();
-
-      // ✅ UPDATED REGEX to handle DAL AI, DAL RA, SC, and BA
-      const markerRe = /(here\s+is\s+(?:the\s+)?student'?s\s+question|here\s+is\s+(?:the\s+)?research\s+question|here\s+is\s+(?:the\s+)?user'?s\s+question|^(?:student'?s|research|user'?s)\s+question)\s*[:\-–—]\s*/im;
-      let question = normalized;
-      const m = markerRe.exec(normalized);
-      if (m) {
-        question = normalized.slice(m.index + m[0].length);
-      }
-
-      const firstLine = question.split('\n')[0].trim();
-      const snippet = firstLine.slice(0, 240);
-
-      if (snippet) console.log('user_input snippet:', snippet); // DEBUG
-    } catch (_) {
-      console.log('⚠️ Logging block failed'); // DEBUG
+      r = await openai.chat.completions.create({
+        model: 'gpt-5',
+        messages: payload.messages || [],
+        max_completion_tokens: typeof payload.max_completion_tokens === 'number'
+          ? payload.max_completion_tokens
+          : 2600,
+        temperature: 1,
+        signal: controller.signal
+      });
+    } catch (err) {
+      console.error('❌ OpenAI error:', err.message);
+      return res.status(504).json({ error: 'GPT-5 request timed out or failed.' });
+    } finally {
+      clearTimeout(timeout);
     }
-    /* === END NEW BLOCK === */
 
-    console.log('🔹 Sending request to OpenAI with', (payload.messages || []).length, 'messages'); // DEBUG
-
-    const r = await openai.chat.completions.create({
-      model: 'gpt-5',
-      messages: payload.messages || [],
-      max_completion_tokens: typeof payload.max_completion_tokens === 'number' ? payload.max_completion_tokens : 2600,
-      temperature: 1
-    });
+    console.log(`⏱️ OpenAI response received at ${new Date().toISOString()}`);
 
     const reply = r.choices?.[0]?.message?.content || '';
-    console.log('✅ OpenAI response received, length:', reply.length); // DEBUG
-
     const safeReply = await sanitize(reply);
     res.json({ answer: safeReply });
   } catch (err){
-    console.error('❌ /ask error:', err.message); // DEBUG
+    console.error('❌ /ask error:', err.message);
     res.status(500).json({ error: 'Failed to process request.' });
   }
 });
@@ -287,10 +267,10 @@ app.post('/log', express.json({ limit: '1mb' }), async (req, res) => {
       [clean(user_input), clean(answer), Number.isFinite(timestamp) ? timestamp : Date.now()]
     );
 
-    console.log('📝 Logged question ID:', result.rows[0]?.id); // DEBUG
+    console.log('📝 Logged question ID:', result.rows[0]?.id);
     res.status(201).json({ ok: true, id: result.rows[0]?.id });
   } catch (err){
-    console.error('❌ /log insert error:', err.message); // DEBUG
+    console.error('❌ /log insert error:', err.message);
     res.status(500).json({ ok: false, error: 'db-insert-failed' });
   }
 });
