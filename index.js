@@ -247,6 +247,15 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
 
     console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
+    /* === FAST MODE TOGGLE === */
+    if (req.query.fast === '1') {
+      payload.messages.unshift({
+        role: 'system',
+        content: 'FAST MODE: Skip extended reasoning and verification. Respond directly and concisely using the most likely correct information. Provide the answer immediately, like GPT-4o with SKIP enabled.'
+      });
+      console.log('⚡ FAST MODE ENABLED');
+    }
+
     const r = await openai.chat.completions.create({
       model: 'gpt-5',
       messages: payload.messages || [],
