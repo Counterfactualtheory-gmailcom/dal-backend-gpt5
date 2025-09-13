@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DAL Answer</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.45;
+      background: #f7f7f7;
+    }
+    .container {
+      border: 3px solid #F0C40F;
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 200px;
+      background: #fff;
+      margin-top: 12px;
+    }
+    /* preserve line breaks safely */
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+      font: 16px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+  </style>
+  <script src="https://thunkable.github.io/webviewer-extension/thunkableWebviewerExtension.js"></script>
+</head>
+<body>
+  <!-- Output container for AI response -->
+  <div class="container"><pre id="out">READY</pre></div>
+
+  <script>
+    const out = document.getElementById('out');
+
+    // Tell the app we're ready to receive the answer
+    ThunkableWebviewerExtension.postMessage('ready');
+
+    // App sends the answer as PLAIN TEXT (not HTML)
+    ThunkableWebviewerExtension.receiveMessage(function(message) {
+      // ensure it's a string and render safely with textContent
+      out.textContent = String(message || '');
+    });
+  </script>
+</body>
+</html>
