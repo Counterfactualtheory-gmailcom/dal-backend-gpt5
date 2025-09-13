@@ -252,7 +252,7 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       messages: payload.messages || [],
       max_completion_tokens: typeof payload.max_completion_tokens === 'number'
         ? payload.max_completion_tokens
-        : 2600,
+        : 1200,
       temperature: 1
     });
 
