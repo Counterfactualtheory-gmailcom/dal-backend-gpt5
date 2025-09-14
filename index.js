@@ -211,6 +211,9 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
 
     console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
+    // === SINGLE NEW DEBUG LOG ADDED HERE ===
+    console.log("🔹 Sending to OpenAI:", JSON.stringify(payload.messages, null, 2));
+
     // === GPT-5 request with timeout ===
     console.log(`⏱️ OpenAI request started at ${new Date().toISOString()}`);
     const controller = new AbortController();
