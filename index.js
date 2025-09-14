@@ -214,30 +214,29 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     // === SINGLE NEW DEBUG LOG ADDED HERE ===
     console.log("🔹 Sending to OpenAI:", JSON.stringify(payload.messages, null, 2));
 
-    // === GPT-5 request with timeout ===
+    // === GPT-5 request with timeout using Promise.race ===
     console.log(`⏱️ OpenAI request started at ${new Date().toISOString()}`);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      controller.abort();
-      console.error('⛔ GPT-5 request timed out after', GPT_TIMEOUT_MS, 'ms');
-    }, GPT_TIMEOUT_MS);
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('GPT-5 request timed out')), GPT_TIMEOUT_MS)
+    );
 
     let r;
     try {
-      r = await openai.chat.completions.create({
-        model: 'gpt-5',
-        messages: payload.messages || [],
-        max_completion_tokens: typeof payload.max_completion_tokens === 'number'
-          ? payload.max_completion_tokens
-          : 2600,
-        temperature: 1,
-        signal: controller.signal
-      });
+      r = await Promise.race([
+        openai.chat.completions.create({
+          model: 'gpt-5',
+          messages: payload.messages || [],
+          max_completion_tokens: typeof payload.max_completion_tokens === 'number'
+            ? payload.max_completion_tokens
+            : 2600,
+          temperature: 1
+        }),
+        timeoutPromise
+      ]);
     } catch (err) {
       console.error('❌ OpenAI error:', err.message);
       return res.status(504).json({ error: 'GPT-5 request timed out or failed.' });
-    } finally {
-      clearTimeout(timeout);
     }
 
     console.log(`⏱️ OpenAI response received at ${new Date().toISOString()}`);
