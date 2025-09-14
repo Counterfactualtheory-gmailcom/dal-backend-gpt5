@@ -1,4 +1,4 @@
-// index.js — systemic link fidelity fix + skip liveness for trusted domains + GPT-5 timeout & debug logs
+// index.js — systemic link fidelity fix + skip liveness for trusted domains + GPT-5-chat-latest + clean logs
 
 const express = require('express');
 const cors = require('cors');
@@ -209,12 +209,10 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       catch { payload = { messages: [{ role: 'user', content: req.body }] }; }
     } else { payload = req.body || {}; }
 
+    // Log only first 300 characters to prevent flooding logs
     console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
-    // === SINGLE NEW DEBUG LOG ADDED HERE ===
-    console.log("🔹 Sending to OpenAI:", JSON.stringify(payload.messages, null, 2));
-
-    // === GPT-5 request with timeout using Promise.race ===
+    // === GPT-5-chat-latest with timeout using Promise.race ===
     console.log(`⏱️ OpenAI request started at ${new Date().toISOString()}`);
 
     const timeoutPromise = new Promise((_, reject) =>
@@ -225,7 +223,7 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     try {
       r = await Promise.race([
         openai.chat.completions.create({
-          model: 'gpt-5',
+          model: 'gpt-5-chat-latest', // ✅ updated model name
           messages: payload.messages || [],
           max_completion_tokens: typeof payload.max_completion_tokens === 'number'
             ? payload.max_completion_tokens
