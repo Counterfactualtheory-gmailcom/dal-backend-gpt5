@@ -9,9 +9,6 @@ const axios = require('axios');
 const app = express();
 const port = process.env.PORT || 8080;
 
-// ===== TIMEOUT SETTING (Adjust as needed) =====
-const GPT_TIMEOUT_MS = 15000; // 15 seconds
-
 app.use(cors());
 
 /* ---------------- DB & OpenAI ---------------- */
@@ -212,32 +209,15 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     // Log only first 300 characters to prevent flooding logs
     console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
-    // === GPT-5-chat-latest with timeout using Promise.race ===
-    console.log(`⏱️ OpenAI request started at ${new Date().toISOString()}`);
-
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('GPT-5 request timed out')), GPT_TIMEOUT_MS)
-    );
-
-    let r;
-    try {
-      r = await Promise.race([
-        openai.chat.completions.create({
-          model: 'gpt-5-chat-latest', // ✅ updated model name
-          messages: payload.messages || [],
-          max_completion_tokens: typeof payload.max_completion_tokens === 'number'
-            ? payload.max_completion_tokens
-            : 2600,
-          temperature: 1
-        }),
-        timeoutPromise
-      ]);
-    } catch (err) {
-      console.error('❌ OpenAI error:', err.message);
-      return res.status(504).json({ error: 'GPT-5 request timed out or failed.' });
-    }
-
-    console.log(`⏱️ OpenAI response received at ${new Date().toISOString()}`);
+    // Direct call to GPT-5-chat-latest (no manual timeout race)
+    const r = await openai.chat.completions.create({
+      model: 'gpt-5-chat-latest', // ✅ updated model name
+      messages: payload.messages || [],
+      max_completion_tokens: typeof payload.max_completion_tokens === 'number'
+        ? payload.max_completion_tokens
+        : 2600,
+      temperature: 1
+    });
 
     const reply = r.choices?.[0]?.message?.content || '';
     const safeReply = await sanitize(reply);
