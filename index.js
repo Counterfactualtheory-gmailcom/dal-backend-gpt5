@@ -25,8 +25,8 @@ const dbConfig = {
   database: process.env.PGDATABASE || process.env.POSTGRES_DB,
   password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
   port: process.env.PGPORT || 5432,
-  // ✅ Updated to allow internal Railway connections without SSL
-  ssl: process.env.PGHOST !== 'localhost' ? { rejectUnauthorized: false } : false,
+  // ✅ FIX: Explicitly disable SSL for internal Railway connections
+  ssl: false
 };
 
 const pool = new Pool(dbConfig);
@@ -119,7 +119,6 @@ function fixMalformedEmails(text){
 }
 
 /* ---------------- Liveness Skips ---------------- */
-// ✅ Domains we will NEVER run liveness checks on
 const SKIP_LIVENESS = new Set(["mcgill.ca", "dal.ca", "ukings.ca"]);
 
 /* ---------------- LIVE LINK GUARD ---------------- */
@@ -132,8 +131,7 @@ function okStatus(s){ return (s >= 200 && s < 400) || SOFT_OK.has(s); }
 async function isLiveUrl(url){
   const hname = hostOf(url);
   if (SKIP_LIVENESS.has(hname) || SKIP_LIVENESS.has(base2(hname))) {
-    // ✅ Treat as always live
-    return true;
+    return true; // ✅ Always live for whitelisted domains
   }
 
   const now = Date.now();
@@ -164,8 +162,7 @@ async function isLiveUrl(url){
 /* ---------------- Sanitizer ---------------- */
 async function sanitize(markdown){
   try {
-    // ✅ First, replace any GitHub URLs with the safe fallback
-    markdown = sanitizeGitHubLinks(markdown);
+    markdown = sanitizeGitHubLinks(markdown); // Replace GitHub URLs
 
     let out = fixMalformedEmails(markdown);
     const found = extractUrls(out);
@@ -253,7 +250,6 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
         .replace(/\r/g, '')
         .trim();
 
-      // ✅ UPDATED REGEX to handle DAL AI, DAL RA, SC, and BA
       const markerRe = /(here\s+is\s+(?:the\s+)?student'?s\s+question|here\s+is\s+(?:the\s+)?research\s+question|here\s+is\s+(?:the\s+)?user'?s\s+question|^(?:student'?s|research|user'?s)\s+question)\s*[:\-–—]\s*/im;
       let question = normalized;
       const m = markerRe.exec(normalized);
@@ -268,7 +264,6 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     } catch (_) {
       // never break the request on logging failure
     }
-    /* === END NEW BLOCK === */
 
     console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
