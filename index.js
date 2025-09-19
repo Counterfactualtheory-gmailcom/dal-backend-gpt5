@@ -210,6 +210,20 @@ async function sanitize(markdown){
   }
 }
 
+/* ---------------- /test ---------------- */
+app.get('/test', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT NOW()');
+    res.json({
+      message: 'Backend and database are connected!',
+      time: result.rows[0].now,
+    });
+  } catch (err) {
+    console.error('❌ /test error:', err.message);
+    res.status(500).json({ error: 'Database connection failed', details: err.message });
+  }
+});
+
 /* ---------------- /ask ---------------- */
 app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
   try {
