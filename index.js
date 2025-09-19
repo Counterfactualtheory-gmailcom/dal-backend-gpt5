@@ -1,4 +1,4 @@
-// index.js — systemic link fidelity fix + skip liveness for trusted domains + GPT-5-chat-latest + clean logs
+// index.js — systemic link fidelity fix + skip liveness for trusted domains
 
 const express = require('express');
 const cors = require('cors');
@@ -10,6 +10,13 @@ const app = express();
 const port = process.env.PORT || 8080;
 
 app.use(cors());
+
+/* ---------------- GitHub URL Sanitizer ---------------- */
+// ✅ Replace ANY GitHub-related link with a safe fallback
+function sanitizeGitHubLinks(text) {
+  const fallbackUrl = "https://rppa-appr.ca/en/summary"; // safe canonical APPR summary URL
+  return text.replace(/https?:\/\/[^\s]*github[^\s)]+/gi, fallbackUrl);
+}
 
 /* ---------------- DB & OpenAI ---------------- */
 const dbConfig = {
@@ -64,8 +71,10 @@ const DOMAIN_FALLBACKS = {
   "ukings.ca": "https://ukings.ca",
   "dsu.ca": "https://www.dsu.ca",
 
-  // ✅ McGill redirects
+  // ✅ New systemic redirect for McGill academic lifecycle (sabbaticals, tenure, promotion)
   "apo.mcgill.ca": "https://www.mcgill.ca/apo/",
+
+  // ✅ Default McGill fallback remains the Research portal
   "mcgill.ca": "https://www.mcgill.ca/research/",
   "mcgilllibrary.ca": "https://www.mcgill.ca/library",
 
@@ -85,7 +94,7 @@ function extractUrls(text){
   return [...new Set((text.match(/https?:\/\/[^\s)\]]+/gi) || []))];
 }
 function normUrl(u){
-  try {
+  try{
     const x = new URL(u);
     x.hash=""; x.search="";
     return x.toString().replace(/\/$/,"").toLowerCase();
@@ -109,6 +118,7 @@ function fixMalformedEmails(text){
 }
 
 /* ---------------- Liveness Skips ---------------- */
+// ✅ Domains we will NEVER run liveness checks on
 const SKIP_LIVENESS = new Set(["mcgill.ca", "dal.ca", "ukings.ca"]);
 
 /* ---------------- LIVE LINK GUARD ---------------- */
@@ -121,7 +131,8 @@ function okStatus(s){ return (s >= 200 && s < 400) || SOFT_OK.has(s); }
 async function isLiveUrl(url){
   const hname = hostOf(url);
   if (SKIP_LIVENESS.has(hname) || SKIP_LIVENESS.has(base2(hname))) {
-    return true; // Always trust these domains
+    // ✅ Treat as always live
+    return true;
   }
 
   const now = Date.now();
@@ -152,6 +163,9 @@ async function isLiveUrl(url){
 /* ---------------- Sanitizer ---------------- */
 async function sanitize(markdown){
   try {
+    // ✅ First, replace any GitHub URLs with the safe fallback
+    markdown = sanitizeGitHubLinks(markdown);
+
     let out = fixMalformedEmails(markdown);
     const found = extractUrls(out);
 
@@ -198,7 +212,6 @@ async function sanitize(markdown){
 
 /* ---------------- /ask ---------------- */
 app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
-  console.log('🚀 /ask endpoint triggered');
   try {
     let payload;
     if (typeof req.body === 'string') {
@@ -206,17 +219,49 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       catch { payload = { messages: [{ role: 'user', content: req.body }] }; }
     } else { payload = req.body || {}; }
 
-    // Log only first 300 characters to prevent flooding logs
+    /* === NEW: log only the student's or research question (strip scaffolding) === */
+    try {
+      const msgs = Array.isArray(payload.messages) ? payload.messages : [];
+      const lastUserMsg = [...msgs].reverse().find(m => m && m.role === 'user');
+
+      const toText = (c) => {
+        if (typeof c === 'string') return c;
+        if (Array.isArray(c)) return c.map(p => (typeof p?.text === 'string' ? p.text : '')).join(' ');
+        if (c && typeof c === 'object' && typeof c.text === 'string') return c.text;
+        return '';
+      };
+
+      const raw = toText(lastUserMsg?.content || '');
+      const normalized = raw
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/\r/g, '')
+        .trim();
+
+      // ✅ UPDATED REGEX to handle DAL AI, DAL RA, SC, and BA
+      const markerRe = /(here\s+is\s+(?:the\s+)?student'?s\s+question|here\s+is\s+(?:the\s+)?research\s+question|here\s+is\s+(?:the\s+)?user'?s\s+question|^(?:student'?s|research|user'?s)\s+question)\s*[:\-–—]\s*/im;
+      let question = normalized;
+      const m = markerRe.exec(normalized);
+      if (m) {
+        question = normalized.slice(m.index + m[0].length);
+      }
+
+      const firstLine = question.split('\n')[0].trim();
+      const snippet = firstLine.slice(0, 240);
+
+      if (snippet) console.log('user_input:', snippet);
+    } catch (_) {
+      // never break the request on logging failure
+    }
+    /* === END NEW BLOCK === */
+
     console.log('📥 /ask payload (first 300):', JSON.stringify(payload).slice(0, 300));
 
-    // Direct call to GPT-5-chat-latest (no manual timeout race)
     const r = await openai.chat.completions.create({
-      model: 'gpt-5-chat-latest', // ✅ updated model name
+      model: 'gpt-5-chat-latest',
       messages: payload.messages || [],
-      max_completion_tokens: typeof payload.max_completion_tokens === 'number'
-        ? payload.max_completion_tokens
-        : 2600,
-      temperature: 1
+      max_tokens: typeof payload.max_tokens === 'number' ? payload.max_tokens : 2600,
+      temperature: typeof payload.temperature === 'number' ? payload.temperature : 0.6,
     });
 
     const reply = r.choices?.[0]?.message?.content || '';
