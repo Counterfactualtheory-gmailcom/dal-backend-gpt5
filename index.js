@@ -163,7 +163,7 @@ async function isLiveUrl(url){
 }
 
 /* ---------------- PGVECTOR Integration ---------------- */
-async function fetchTopMatches(userQuery, topN = 2) {  
+async function fetchTopMatches(userQuery, topN = 10) {  // increased from 2 → 10
   const embeddingResponse = await openai.embeddings.create({
     model: "text-embedding-3-large", // must match DB schema (vector(3072))
     input: userQuery,
@@ -263,7 +263,7 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     } else { payload = req.body || {}; }
 
     const userMessage = payload.messages?.find(m => m.role === 'user')?.content || '';
-    const topMatches = await fetchTopMatches(userMessage, 2); // now capped at 2
+    const topMatches = await fetchTopMatches(userMessage, 10); // now capped at 10
 
     // ✅ FIX: use the actual column returned by the query
     const contextBlock = topMatches
