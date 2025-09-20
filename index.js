@@ -163,7 +163,7 @@ async function isLiveUrl(url){
 }
 
 /* ---------------- PGVECTOR Integration ---------------- */
-async function fetchTopMatches(userQuery, topN = 3) {  // reduced from 5 → 3
+async function fetchTopMatches(userQuery, topN = 2) {  // reduced from 3 → 2
   const embeddingResponse = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: userQuery,
@@ -171,7 +171,7 @@ async function fetchTopMatches(userQuery, topN = 3) {  // reduced from 5 → 3
   const embedding = embeddingResponse.data[0].embedding;
 
   const result = await pool.query(
-    `SELECT url, title, description, embedding <=> $1 AS distance
+    `SELECT url, title, embedding <=> $1 AS distance
      FROM greenlist_embeddings
      ORDER BY distance ASC
      LIMIT $2`,
@@ -254,22 +254,15 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     } else { payload = req.body || {}; }
 
     const userMessage = payload.messages?.find(m => m.role === 'user')?.content || '';
-    const topMatches = await fetchTopMatches(userMessage, 3); // reduced to 3 matches
+    const topMatches = await fetchTopMatches(userMessage, 2); // now capped at 2
 
-    const contextBlock = topMatches.map(match => {
-      const trimmedDesc = (match.description || '').substring(0, 500); // cap description at 500 chars
-      return `Title: ${match.title}\nURL: ${match.url}\nDescription: ${trimmedDesc}\n`;
-    }).join('\n');
-
-    // Safety cap on entire context block
-    let finalContext = contextBlock;
-    if (finalContext.length > 3000) {
-      finalContext = finalContext.substring(0, 3000);
-    }
+    const contextBlock = topMatches
+      .map(match => `Title: ${match.title}\nURL: ${match.url}\n`)
+      .join('\n');
 
     payload.messages.unshift({
       role: 'system',
-      content: `Use the following relevant sources when answering:\n\n${finalContext}`
+      content: `Use the following verified Greenlist URLs when answering:\n\n${contextBlock}`
     });
 
     console.log('📥 /ask payload with PGVector context:', JSON.stringify(payload).slice(0, 300));
