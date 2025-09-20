@@ -165,7 +165,7 @@ async function isLiveUrl(url){
 /* ---------------- PGVECTOR Integration ---------------- */
 async function fetchTopMatches(userQuery, topN = 2) {  // reduced from 3 → 2
   const embeddingResponse = await openai.embeddings.create({
-    model: "text-embedding-3-small",
+    model: "text-embedding-3-large",
     input: userQuery,
   });
   const embedding = embeddingResponse.data[0].embedding;
