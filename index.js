@@ -164,21 +164,21 @@ async function isLiveUrl(url){
 
 /* ---------------- PGVECTOR Integration ---------------- */
 async function fetchTopMatches(userQuery, topN = 10) {  // increased from 2 → 10
+  console.log("🔍 [DEBUG] Fetching top matches for query:", userQuery);
   const embeddingResponse = await openai.embeddings.create({
     model: "text-embedding-3-large", // must match DB schema (vector(3072))
     input: userQuery,
   });
   const embedding = embeddingResponse.data[0].embedding;
+  console.log("🧮 [DEBUG] Embedding length:", embedding.length);
 
-  // ✅ Validate embedding dimensions to prevent mismatches
   if (embedding.length !== 3072) {
+    console.error("❌ [DEBUG] Embedding dimension mismatch. Expected 3072, got:", embedding.length);
     throw new Error(`Embedding dimension mismatch: expected 3072, got ${embedding.length}`);
   }
 
-  // ✅ Convert array to proper pgvector string format
   const vectorString = `[${embedding.join(',')}]`;
 
-  // ✅ Query only the correct existing column
   const result = await pool.query(
     `SELECT content, embedding <=> $1 AS distance
      FROM greenlist_embeddings
@@ -187,6 +187,7 @@ async function fetchTopMatches(userQuery, topN = 10) {  // increased from 2 → 
     [vectorString, topN]
   );
 
+  console.log("📊 [DEBUG] DB returned rows:", result.rows.length);
   return result.rows;
 }
 
@@ -256,6 +257,8 @@ app.get('/test', async (req, res) => {
 /* ---------------- /ask ---------------- */
 app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) => {
   try {
+    console.log("📥 [DEBUG] Incoming /ask request body:", req.body);
+
     let payload;
     if (typeof req.body === 'string') {
       try { payload = JSON.parse(req.body); }
@@ -263,9 +266,11 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     } else { payload = req.body || {}; }
 
     const userMessage = payload.messages?.find(m => m.role === 'user')?.content || '';
-    const topMatches = await fetchTopMatches(userMessage, 10); // now capped at 10
+    console.log("💬 [DEBUG] User message:", userMessage);
 
-    // ✅ FIX: use the actual column returned by the query
+    const topMatches = await fetchTopMatches(userMessage, 10); // now capped at 10
+    console.log("🔗 [DEBUG] Top matches received:", topMatches);
+
     const contextBlock = topMatches
       .map(match => `URL: ${match.content}\n`)
       .join('\n');
@@ -275,7 +280,7 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       content: `Use the following verified Greenlist URLs when answering:\n\n${contextBlock}`
     });
 
-    console.log('📥 /ask payload with PGVector context:', JSON.stringify(payload).slice(0, 300));
+    console.log("📦 [DEBUG] Final payload sent to OpenAI:", JSON.stringify(payload).slice(0, 500));
 
     const r = await openai.chat.completions.create({
       model: 'gpt-5-chat-latest',
@@ -284,11 +289,17 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       temperature: typeof payload.temperature === 'number' ? payload.temperature : 0.6,
     });
 
+    console.log("🤖 [DEBUG] Raw OpenAI response received.");
+
     const reply = r.choices?.[0]?.message?.content || '';
+    console.log("📝 [DEBUG] Model reply length:", reply.length);
+
     const safeReply = await sanitize(reply);
+    console.log("✅ [DEBUG] Final sanitized reply length:", safeReply.length);
+
     res.json({ answer: safeReply });
   } catch (err){
-    console.error('❌ /ask error:', err.message);
+    console.error('❌ /ask error:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to process request.' });
   }
 });
