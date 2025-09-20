@@ -170,8 +170,9 @@ async function fetchTopMatches(userQuery, topN = 2) {  // reduced from 3 → 2
   });
   const embedding = embeddingResponse.data[0].embedding;
 
+  // ✅ FIX: Correct column name - "content" instead of "url"
   const result = await pool.query(
-    `SELECT url, title, embedding <=> $1 AS distance
+    `SELECT content, title, embedding <=> $1 AS distance
      FROM greenlist_embeddings
      ORDER BY distance ASC
      LIMIT $2`,
@@ -257,7 +258,7 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     const topMatches = await fetchTopMatches(userMessage, 2); // now capped at 2
 
     const contextBlock = topMatches
-      .map(match => `Title: ${match.title}\nURL: ${match.url}\n`)
+      .map(match => `Title: ${match.title}\nURL: ${match.content}\n`)
       .join('\n');
 
     payload.messages.unshift({
