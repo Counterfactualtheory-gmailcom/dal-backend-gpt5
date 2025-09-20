@@ -16,7 +16,7 @@ const dbConfig = {
   database: process.env.PGDATABASE || process.env.POSTGRES_DB,
   password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
   port: process.env.PGPORT || 5432,
-  ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false }, // <-- FIXED
+  ssl: true // <-- Force SSL explicitly for Railway
 };
 
 const pool = new Pool(dbConfig);
