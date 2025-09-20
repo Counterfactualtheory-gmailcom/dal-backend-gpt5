@@ -1,17 +1,54 @@
 {
   "general": [
     "https://www.dal.ca",
-    "https://www.ukings.ca"
+    "https://www.ukings.ca",
+    "https://libraries.dal.ca",
+    "https://www.dsu.ca",
+    "https://cdn.dal.ca",
+    "https://medicine.dal.ca"
   ],
   "studentServices": [
     "https://www.dal.ca/campus_life/academic-support.html",
     "https://www.dal.ca/campus_life/health-and-wellness.html",
-    "https://www.dal.ca/campus_life/residence.html"
+    "https://www.dal.ca/campus_life/residence.html",
+    "https://www.dal.ca/campus_life/health-and-wellness/my-health.html",
+    "https://www.dal.ca/dept/hr.html",
+    "https://www.dal.ca/dept/hres.html",
+    "https://www.dal.ca/faculty/gradstudies.html",
+    "https://www.dal.ca/faculty/gradstudies/postdoctoral-fellows.html",
+    "https://www.dal.ca/dept/academic-calendar.html"
   ],
   "research": [
     "https://www.dal.ca/research",
     "https://www.nserc-crsng.gc.ca",
     "https://www.sshrc-crsh.gc.ca",
-    "https://cihr-irsc.gc.ca"
+    "https://sshrc-crsh.canada.ca/en",
+    "https://cihr-irsc.gc.ca",
+    "https://science.gc.ca/site/science/en/interagency-research-funding/policies-and-guidelines",
+    "https://ccv-cvc.ca",
+    "https://fundingopps-osr.research.mcgill.ca",
+    "https://researchnet-recherchenet.ca",
+    "https://cfref-apogee.gc.ca",
+    "https://innovation.ca",
+    "https://mitacs.ca",
+    "https://genomecanada.ca",
+    "https://springboardatlantic.ca",
+    "https://researchns.ca",
+    "https://u15.ca",
+    "https://crdcn.ca",
+    "https://alliancecan.ca",
+    "https://crkn-rcdr.ca"
+  ],
+  "policies": [
+    "https://www.dal.ca/dept/university_secretariat/policies.html",
+    "https://www.dal.ca/dept/university_secretariat/academic-policies.html",
+    "https://www.dal.ca/dept/university_secretariat/student-policies.html",
+    "https://www.dal.ca/dept/university_secretariat/employment-policies.html"
+  ],
+  "libraries": [
+    "https://libraries.dal.ca/services.html",
+    "https://libraries.dal.ca/collections.html",
+    "https://libraries.dal.ca/subject-guides.html",
+    "https://libraries.dal.ca/help.html"
   ]
 }
