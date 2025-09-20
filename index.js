@@ -275,10 +275,13 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       .map(match => `URL: ${match.content}\n`)
       .join('\n');
 
-    payload.messages.unshift({
-      role: 'system',
-      content: `Use the following verified Greenlist URLs when answering:\n\n${contextBlock}`
-    });
+    // ✅ Prevent duplicate system messages
+    if (!payload.messages.some(m => m.role === 'system')) {
+      payload.messages.unshift({
+        role: 'system',
+        content: `Use the following verified Greenlist URLs when answering:\n\n${contextBlock}`
+      });
+    }
 
     console.log("📦 [DEBUG] Final payload sent to OpenAI:", JSON.stringify(payload).slice(0, 500));
 
