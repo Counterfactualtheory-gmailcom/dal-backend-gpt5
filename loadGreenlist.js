@@ -76,11 +76,14 @@ async function generateAndInsertEmbeddings() {
 
       const embedding = embeddingResponse.data[0].embedding;
 
+      // FIX: Convert JS array to PostgreSQL vector literal
+      const vectorLiteral = `[${embedding.join(',')}]`;
+
       await pool.query(
         `INSERT INTO greenlist_embeddings (content, embedding)
          VALUES ($1, $2)
          ON CONFLICT (content) DO NOTHING`,
-        [url, embedding]
+        [url, vectorLiteral]
       );
 
       console.log(`✅ Inserted successfully: ${url}`);
