@@ -170,13 +170,16 @@ async function fetchTopMatches(userQuery, topN = 2) {  // reduced from 3 → 2
   });
   const embedding = embeddingResponse.data[0].embedding;
 
-  // ✅ FIX: select only existing columns (content + distance)
+  // ✅ FIX: convert array to proper pgvector string format
+  const vectorString = `[${embedding.join(',')}]`;
+
+  // ✅ Query only the correct existing column
   const result = await pool.query(
     `SELECT content, embedding <=> $1 AS distance
      FROM greenlist_embeddings
      ORDER BY distance ASC
      LIMIT $2`,
-    [embedding, topN]
+    [vectorString, topN]
   );
 
   return result.rows;
