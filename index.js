@@ -163,7 +163,7 @@ async function isLiveUrl(url){
 }
 
 /* ---------------- PGVECTOR Integration ---------------- */
-async function fetchTopMatches(userQuery, topN = 5) {
+async function fetchTopMatches(userQuery, topN = 3) {  // reduced from 5 → 3
   const embeddingResponse = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: userQuery,
@@ -254,15 +254,22 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     } else { payload = req.body || {}; }
 
     const userMessage = payload.messages?.find(m => m.role === 'user')?.content || '';
-    const topMatches = await fetchTopMatches(userMessage, 5);
+    const topMatches = await fetchTopMatches(userMessage, 3); // reduced to 3 matches
 
-    const contextBlock = topMatches.map(
-      match => `Title: ${match.title}\nURL: ${match.url}\nDescription: ${match.description}\n`
-    ).join('\n');
+    const contextBlock = topMatches.map(match => {
+      const trimmedDesc = (match.description || '').substring(0, 500); // cap description at 500 chars
+      return `Title: ${match.title}\nURL: ${match.url}\nDescription: ${trimmedDesc}\n`;
+    }).join('\n');
+
+    // Safety cap on entire context block
+    let finalContext = contextBlock;
+    if (finalContext.length > 3000) {
+      finalContext = finalContext.substring(0, 3000);
+    }
 
     payload.messages.unshift({
       role: 'system',
-      content: `Use the following relevant sources when answering:\n\n${contextBlock}`
+      content: `Use the following relevant sources when answering:\n\n${finalContext}`
     });
 
     console.log('📥 /ask payload with PGVector context:', JSON.stringify(payload).slice(0, 300));
