@@ -320,5 +320,24 @@ app.post('/log', express.json({ limit: '1mb' }), async (req, res) => {
   }
 });
 
+/* ---------------- /load ---------------- */
+// ✅ Trigger loadGreenlist.js to insert all URLs into greenlist_embeddings
+const { exec } = require('child_process');
+
+app.post('/load', (req, res) => {
+  console.log('🚀 /load endpoint triggered: starting greenlist loader...');
+  exec('node loadGreenlist.js', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`❌ Loader Error: ${error.message}`);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    if (stderr) {
+      console.error(`⚠️ Loader Stderr: ${stderr}`);
+    }
+    console.log(`✅ Loader Output: ${stdout}`);
+    res.json({ success: true, message: 'Greenlist loader executed successfully', output: stdout });
+  });
+});
+
 /* ---------------- boot ---------------- */
 app.listen(port, '0.0.0.0', () => console.log(`✅ Backend running on port ${port}`));
