@@ -318,7 +318,7 @@ app.post('/load', (req, res) => {
   console.log('Headers:', req.headers);
   console.log('Body:', req.body);
 
-  exec('node loadGreenlist.js', { maxBuffer: 1024 * 500 }, (error, stdout, stderr) => {
+  exec('node loadGreenlist.js', { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
     if (error) {
       console.error(`❌ Loader Error: ${error.message}`);
       return res.status(500).json({ success: false, error: error.message });
