@@ -163,10 +163,10 @@ async function isLiveUrl(url){
 }
 
 /* ---------------- PGVECTOR Integration ---------------- */
-async function fetchTopMatches(userQuery, topN = 10) {  // increased from 2 → 10
+async function fetchTopMatches(userQuery, topN = 10) {
   console.log("🔍 [DEBUG] Fetching top matches for query:", userQuery);
   const embeddingResponse = await openai.embeddings.create({
-    model: "text-embedding-3-large", // must match DB schema (vector(3072))
+    model: "text-embedding-3-large",
     input: userQuery,
   });
   const embedding = embeddingResponse.data[0].embedding;
@@ -268,14 +268,12 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     const userMessage = payload.messages?.find(m => m.role === 'user')?.content || '';
     console.log("💬 [DEBUG] User message:", userMessage);
 
-    const topMatches = await fetchTopMatches(userMessage, 10); // now capped at 10
+    const topMatches = await fetchTopMatches(userMessage, 10); // up to 10
     console.log("🔗 [DEBUG] Top matches received:", topMatches);
 
-    // ✅ Deduplicate and cap context to avoid token overload
     const uniqueUrls = [...new Set(topMatches.map(m => m.content.trim()))].slice(0, 8);
     const contextBlock = uniqueUrls.map(url => `URL: ${url}\n`).join('\n');
 
-    // ✅ Prevent duplicate system messages
     if (!payload.messages.some(m => m.role === 'system')) {
       payload.messages.unshift({
         role: 'system',
@@ -297,7 +295,6 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     let reply = r.choices?.[0]?.message?.content || '';
     console.log("📝 [DEBUG] Model reply length:", reply.length);
 
-    // ✅ Multi-question handling: append follow-up prompt
     if ((userMessage.match(/\?/g) || []).length > 1) {
       reply += `\n\n⚠️ You've asked several important questions, and I want to make sure you get full, accurate answers. I've answered the first question above. Please ask your next question separately so I can focus on it and give you the best possible response.`;
     }
