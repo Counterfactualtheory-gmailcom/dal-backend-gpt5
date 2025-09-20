@@ -294,8 +294,13 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
 
     console.log("🤖 [DEBUG] Raw OpenAI response received.");
 
-    const reply = r.choices?.[0]?.message?.content || '';
+    let reply = r.choices?.[0]?.message?.content || '';
     console.log("📝 [DEBUG] Model reply length:", reply.length);
+
+    // ✅ Multi-question handling: append follow-up prompt
+    if ((userMessage.match(/\?/g) || []).length > 1) {
+      reply += `\n\n⚠️ You've asked several important questions, and I want to make sure you get full, accurate answers. I've answered the first question above. Please ask your next question separately so I can focus on it and give you the best possible response.`;
+    }
 
     const safeReply = await sanitize(reply);
     console.log("✅ [DEBUG] Final sanitized reply length:", safeReply.length);
