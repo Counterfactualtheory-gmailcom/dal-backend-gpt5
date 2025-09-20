@@ -163,14 +163,19 @@ async function isLiveUrl(url){
 }
 
 /* ---------------- PGVECTOR Integration ---------------- */
-async function fetchTopMatches(userQuery, topN = 2) {  // reduced from 3 → 2
+async function fetchTopMatches(userQuery, topN = 2) {  
   const embeddingResponse = await openai.embeddings.create({
-    model: "text-embedding-3-large",
+    model: "text-embedding-3-large", // must match DB schema (vector(3072))
     input: userQuery,
   });
   const embedding = embeddingResponse.data[0].embedding;
 
-  // ✅ FIX: convert array to proper pgvector string format
+  // ✅ Validate embedding dimensions to prevent mismatches
+  if (embedding.length !== 3072) {
+    throw new Error(`Embedding dimension mismatch: expected 3072, got ${embedding.length}`);
+  }
+
+  // ✅ Convert array to proper pgvector string format
   const vectorString = `[${embedding.join(',')}]`;
 
   // ✅ Query only the correct existing column
