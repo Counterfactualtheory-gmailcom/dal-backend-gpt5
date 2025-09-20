@@ -19,13 +19,14 @@ function sanitizeGitHubLinks(text) {
 }
 
 /* ---------------- DB & OpenAI ---------------- */
+// ✅ Updated to completely disable SSL to fix connection issue
 const dbConfig = {
   user: process.env.PGUSER || process.env.POSTGRES_USER,
   host: process.env.PGHOST,
   database: process.env.PGDATABASE || process.env.POSTGRES_DB,
   password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
   port: process.env.PGPORT || 5432,
-  ssl: { rejectUnauthorized: false },
+  ssl: false  // Force SSL to be completely disabled
 };
 
 const pool = new Pool(dbConfig);
