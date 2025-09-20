@@ -91,14 +91,12 @@ const DOMAIN_FALLBACKS = {
 
 /* ---------------- Helpers ---------------- */
 function extractUrls(text){
-  // FIX: capture URLs up to whitespace, then strip trailing punctuation/brackets safely
   const candidates = text.match(/https?:\/\/\S+/gi) || [];
   const cleaned = candidates.map(u => u.replace(/[)\]\.,;:!?"'<>]+$/g, ''));
   return [...new Set(cleaned)];
 }
 function normUrl(u){
   try{
-    // FIX: trim + strip dangling punctuation before URL parsing
     const cleaned = String(u).trim().replace(/[)\]\.,;:!?"'<>]+$/g, '');
     const x = new URL(cleaned);
     x.hash=""; x.search="";
@@ -123,7 +121,6 @@ function fixMalformedEmails(text){
 }
 
 /* ---------------- Liveness Skips ---------------- */
-// ✅ Domains we will NEVER run liveness checks on
 const SKIP_LIVENESS = new Set(["mcgill.ca", "dal.ca", "ukings.ca"]);
 
 /* ---------------- LIVE LINK GUARD ---------------- */
@@ -136,7 +133,6 @@ function okStatus(s){ return (s >= 200 && s < 400) || SOFT_OK.has(s); }
 async function isLiveUrl(url){
   const hname = hostOf(url);
   if (SKIP_LIVENESS.has(hname) || SKIP_LIVENESS.has(base2(hname))) {
-    // ✅ Treat as always live
     return true;
   }
 
@@ -166,7 +162,6 @@ async function isLiveUrl(url){
 }
 
 /* ---------------- PGVECTOR Integration ---------------- */
-// ✅ Fetch top N most relevant greenlist items for context
 async function fetchTopMatches(userQuery, topN = 5) {
   const embeddingResponse = await openai.embeddings.create({
     model: "text-embedding-3-small",
@@ -188,7 +183,6 @@ async function fetchTopMatches(userQuery, topN = 5) {
 /* ---------------- Sanitizer ---------------- */
 async function sanitize(markdown){
   try {
-    // ✅ First, replace any GitHub URLs with the safe fallback
     markdown = sanitizeGitHubLinks(markdown);
 
     let out = fixMalformedEmails(markdown);
@@ -258,18 +252,13 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
       catch { payload = { messages: [{ role: 'user', content: req.body }] }; }
     } else { payload = req.body || {}; }
 
-    // ✅ Extract the last user message for PGVector search
     const userMessage = payload.messages?.find(m => m.role === 'user')?.content || '';
-
-    // Fetch top matches from PGVector
     const topMatches = await fetchTopMatches(userMessage, 5);
 
-    // Build context block for GPT
     const contextBlock = topMatches.map(
       match => `Title: ${match.title}\nURL: ${match.url}\nDescription: ${match.description}\n`
     ).join('\n');
 
-    // Inject context at the beginning of messages
     payload.messages.unshift({
       role: 'system',
       content: `Use the following relevant sources when answering:\n\n${contextBlock}`
@@ -321,11 +310,13 @@ app.post('/log', express.json({ limit: '1mb' }), async (req, res) => {
 });
 
 /* ---------------- /load ---------------- */
-// ✅ Trigger loadGreenlist.js to insert all URLs into greenlist_embeddings
 const { exec } = require('child_process');
 
 app.post('/load', (req, res) => {
   console.log('🚀 /load endpoint triggered: starting greenlist loader...');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+
   exec('node loadGreenlist.js', (error, stdout, stderr) => {
     if (error) {
       console.error(`❌ Loader Error: ${error.message}`);
@@ -337,6 +328,12 @@ app.post('/load', (req, res) => {
     console.log(`✅ Loader Output: ${stdout}`);
     res.json({ success: true, message: 'Greenlist loader executed successfully', output: stdout });
   });
+});
+
+/* ---------------- Catch-All Debug ---------------- */
+app.use((req, res) => {
+  console.warn(`⚠️ Unknown route hit: ${req.method} ${req.originalUrl}`);
+  res.status(404).send('Route not found');
 });
 
 /* ---------------- boot ---------------- */
