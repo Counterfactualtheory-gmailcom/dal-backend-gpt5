@@ -1,7 +1,5 @@
 // loadGreenlist.js
 // Script to generate and store embeddings for the DAL AI Greenlist
-// Run manually from terminal to populate the database.
-//
 // Usage: node loadGreenlist.js
 
 const fs = require('fs');
@@ -10,14 +8,20 @@ const { Pool } = require('pg');
 const { OpenAI } = require('openai');
 
 // ---------- CONFIG ----------
+const isInternalHost = /\.railway\.internal$/i.test(String(process.env.PGHOST || ''));
 const dbConfig = {
   user: process.env.PGUSER || process.env.POSTGRES_USER,
   host: process.env.PGHOST,
   database: process.env.PGDATABASE || process.env.POSTGRES_DB,
   password: process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD,
   port: process.env.PGPORT || 5432,
-  ssl: true // <-- Force SSL explicitly for Railway
+  // 🔧 Key change: internal host → no SSL, otherwise SSL on
+  ssl: isInternalHost ? false : { rejectUnauthorized: false },
 };
+
+console.log(
+  `PGCONNECT host=${process.env.PGHOST} port=${process.env.PGPORT} db=${process.env.PGDATABASE || process.env.POSTGRES_DB} ssl=${isInternalHost ? 'disabled' : 'enabled'}`
+);
 
 const pool = new Pool(dbConfig);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -34,14 +38,10 @@ let greenlist;
 try {
   const rawData = fs.readFileSync(urlsPath, 'utf8');
   const parsed = JSON.parse(rawData);
-
-  // Flatten nested structure (if any categories like "general", "studentServices", etc.)
-  greenlist = Object.values(parsed).flat();
-
+  greenlist = Array.isArray(parsed) ? parsed : Object.values(parsed).flat();
   if (!Array.isArray(greenlist) || greenlist.length === 0) {
     throw new Error('urls.json must contain a non-empty array of URLs.');
   }
-
   console.log(`✅ Loaded ${greenlist.length} total Greenlist URLs.`);
   console.log('🔹 First 5 URLs:', greenlist.slice(0, 5));
 } catch (err) {
@@ -69,7 +69,6 @@ async function generateAndInsertEmbeddings() {
     try {
       console.log(`🔹 Processing URL: ${url}`);
 
-      // Generate embedding
       const embeddingResponse = await openai.embeddings.create({
         model: 'text-embedding-3-large',
         input: url,
@@ -77,7 +76,6 @@ async function generateAndInsertEmbeddings() {
 
       const embedding = embeddingResponse.data[0].embedding;
 
-      // Insert into database with duplicate protection
       await pool.query(
         `INSERT INTO greenlist_embeddings (content, embedding)
          VALUES ($1, $2)
