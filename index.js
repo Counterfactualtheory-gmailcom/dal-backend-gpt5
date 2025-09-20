@@ -271,9 +271,9 @@ app.post('/ask', express.text({ type: '*/*', limit: '1mb' }), async (req, res) =
     const topMatches = await fetchTopMatches(userMessage, 10); // now capped at 10
     console.log("🔗 [DEBUG] Top matches received:", topMatches);
 
-    const contextBlock = topMatches
-      .map(match => `URL: ${match.content}\n`)
-      .join('\n');
+    // ✅ Deduplicate and cap context to avoid token overload
+    const uniqueUrls = [...new Set(topMatches.map(m => m.content.trim()))].slice(0, 8);
+    const contextBlock = uniqueUrls.map(url => `URL: ${url}\n`).join('\n');
 
     // ✅ Prevent duplicate system messages
     if (!payload.messages.some(m => m.role === 'system')) {
