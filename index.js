@@ -91,11 +91,16 @@ const DOMAIN_FALLBACKS = {
 
 /* ---------------- Helpers ---------------- */
 function extractUrls(text){
-  return [...new Set((text.match(/https?:\/\/[^\s)\]]+/gi) || []))];
+  // FIX: capture URLs up to whitespace, then strip trailing punctuation/brackets safely
+  const candidates = text.match(/https?:\/\/\S+/gi) || [];
+  const cleaned = candidates.map(u => u.replace(/[)\]\.,;:!?"'<>]+$/g, ''));
+  return [...new Set(cleaned)];
 }
 function normUrl(u){
   try{
-    const x = new URL(u);
+    // FIX: trim + strip dangling punctuation before URL parsing
+    const cleaned = String(u).trim().replace(/[)\]\.,;:!?"'<>]+$/g, '');
+    const x = new URL(cleaned);
     x.hash=""; x.search="";
     return x.toString().replace(/\/$/,"").toLowerCase();
   } catch { return null; }
